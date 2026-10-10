@@ -1,28 +1,82 @@
-# Backend API
+# European Truck Route Optimizer — API
 
-## Purpose
+Backend service for the European Truck Route Optimizer project.
 
-This directory contains the backend API responsible for processing route planning requests and coordinating the application's core services.
+The API will provide endpoints for planning, evaluating and comparing heavy-truck routes across Europe.
 
-## Planned Technology Stack
+## Technology stack
 
 - Python
 - FastAPI
-- Pydantic
+- Uvicorn
 - Pytest
 
-## Responsibilities
+## Requirements
 
-- Validate route requests and truck profiles.
-- Expose HTTP endpoints for the frontend.
-- Coordinate routing and optimization services.
-- Return structured route alternatives and cost estimates.
-- Handle errors consistently.
-- Expose a health-check endpoint.
-- Apply security and input-validation controls.
+- Python 3.11 or newer
+- pip
 
-## Development Status
+## Local setup
 
-**Status:** Planned.
+From the repository root, create a virtual environment:
 
-The initial implementation will provide a minimal API with health checks, request validation and automated tests.
+```bash
+python -m venv .venv
+```
+
+Activate it on Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Activate it on macOS or Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+Install the API dependencies:
+
+```bash
+python -m pip install -r services/api/requirements.txt
+```
+
+## Run the API
+
+From the repository root:
+
+```bash
+python -m uvicorn app.main:app --app-dir services/api --reload
+```
+
+The API will be available at `http://127.0.0.1:8000`.
+
+## API documentation
+
+- Interactive documentation: `http://127.0.0.1:8000/docs`
+- OpenAPI schema: `http://127.0.0.1:8000/openapi.json`
+
+## Health check
+
+Send a GET request to `/health`.
+
+Expected response:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+## Run tests
+
+From the repository root:
+
+```bash
+python -m pytest services/api/tests -q
+```
+
+## Current scope
+
+The initial implementation provides a health endpoint and an automated test. Route planning, vehicle restrictions, cost estimation and routing-provider integrations will be implemented in subsequent stages.
