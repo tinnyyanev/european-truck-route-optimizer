@@ -1,28 +1,73 @@
-# Web Application
+# European Truck Route Optimizer — Web
 
-## Purpose
+Frontend application for the European Truck Route Optimizer project.
 
-This directory contains the frontend application for European Truck Route Optimizer.
+The web application will allow users to plan and compare heavy-truck routes across Europe, starting with routes through Spain, France and Germany.
 
-The web application will provide an interface for planning truck routes, configuring vehicle profiles, comparing route alternatives and visualizing results on an interactive map.
-
-## Planned Technology Stack
+## Technology stack
 
 - Next.js
 - React
 - TypeScript
-- MapLibre GL JS
+- Tailwind CSS
+- MapLibre GL JS (planned)
 
-## Planned Features
+## Requirements
 
-- Origin and destination selection.
-- Truck profile configuration.
-- Route comparison by distance, estimated travel time and operating cost.
-- Interactive route visualization.
-- Clear presentation of warnings and unavailable restriction data.
+- Node.js LTS
+- npm
 
-## Development Status
+## Local development
 
-**Status:** Planned.
+From the repository root, navigate to the web application:
 
-The frontend will be developed after the initial backend architecture and API contracts have been established.
+```bash
+cd apps/web
+```
+
+Install dependencies if they are not already installed:
+
+```bash
+npm install
+```
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Available scripts
+
+- `npm run dev`: start the development server.
+- `npm run build`: build the application for production.
+- `npm run start`: start the production server after building.
+- `npm run lint`: run the configured lint checks, if available.
+
+Check `package.json` for the exact scripts supported by the installed Next.js version.
+
+## Backend integration
+
+The backend API is implemented with FastAPI in `services/api/`.
+
+During local development, the API is expected to run at:
+
+`http://127.0.0.1:8000`
+
+Frontend-to-backend communication will be implemented in a later stage.
+
+## Current scope
+
+The initial frontend setup provides the Next.js application and development environment.
+
+Route planning forms, interactive maps, vehicle configuration, route comparison and API integration will be implemented incrementally.
+
+## Development principles
+
+- Keep frontend and backend responsibilities separate.
+- Use TypeScript for application code.
+- Keep configuration and secrets out of source control.
+- Test changes before committing them.
+- Do not present estimated routes, tolls or vehicle restrictions as verified data unless their sources support those claims.
