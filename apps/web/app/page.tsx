@@ -125,23 +125,161 @@ export default function Home() {
   const [length, setLength] = useState("16.5");
   const [axles, setAxles] = useState("5");
   const [status, setStatus] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<
+    "success" | "error" | "info"
+  >("info");
 
-  function handlePlanRoute(event: React.FormEvent<HTMLFormElement>) {
+  const [apiResult, setApiResult] = useState<{
+    calculation_status: string;
+    message: string;
+  } | null>(null);
+
+  async function handlePlanRoute(
+  event: React.FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
+    if (isSubmitting) return;
+
+    setStatus("");
+    setApiResult(null);
+
     if (!origin.trim() || !destination.trim()) {
+      setFeedbackType("error");
       setStatus("Enter both an origin and a destination.");
       return;
     }
 
     if (origin.trim().toLowerCase() === destination.trim().toLowerCase()) {
+      setFeedbackType("error");
       setStatus("Origin and destination must be different.");
       return;
     }
 
-    setStatus(
-      "Inputs validated. Connect a routing provider to calculate real routes."
-    );
+    function parseLocation(value: string) {
+    const parts = value.split(",").map((part) => part.trim());
+
+    if (
+      parts.length < 2 ||
+      !parts[0] ||
+      !parts[parts.length - 1]
+    ) {
+      return null;
+    }
+
+    return {
+      city: parts.slice(0, -1).join(", "),
+      country: parts[parts.length - 1],
+    };
+    }
+
+    const parsedOrigin = parseLocation(origin);
+    const parsedDestination = parseLocation(destination);
+
+    if (!parsedOrigin || !parsedDestination) {
+      setFeedbackType("error");
+      setStatus(
+        "Use the format City, Country for both origin and destination."
+      );
+      return;
+    }
+
+    const numericWeight = Number(weight);
+    const numericHeight = Number(height);
+    const numericLength = Number(length);
+
+    if (
+      !Number.isFinite(numericWeight) ||
+      numericWeight <= 0 ||
+      numericWeight > 60 ||
+      !Number.isFinite(numericHeight) ||
+      numericHeight <= 0 ||
+      numericHeight > 4.5 ||
+      !Number.isFinite(numericLength) ||
+      numericLength <= 0 ||
+      numericLength > 25
+    ) {
+      setFeedbackType("error");
+      setStatus(
+        "Check the vehicle values. Weight must be at most 60 tonnes, height 4.5 metres and length 25 metres."
+      );
+      return;
+    }
+
+    if (numericWeight > 40) {
+      setFeedbackType("error");
+      setStatus(
+        "The current API configuration limits standard trucks to 40 tonnes."
+      );
+      return;
+    }
+
+    const payload = {
+      origin: parsedOrigin,
+      destination: parsedDestination,
+      truck: {
+        vehicle_type: "standard",
+        weight_tonnes: numericWeight,
+        height_metres: numericHeight,
+        length_metres: numericLength,
+      },
+    };
+
+    setIsSubmitting(true);
+    setFeedbackType("info");
+    setStatus("Sending your request to the planning API...");
+
+    try {
+      const apiBaseUrl =
+        process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+      const response = await fetch(
+        `${apiBaseUrl.replace(/\/$/, "")}/api/routes/plan`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const detail =
+          typeof data?.detail === "string"
+            ? data.detail
+            : `The API returned HTTP ${response.status}.`;
+
+        setFeedbackType("error");
+        setStatus(detail);
+        return;
+      }
+
+      setApiResult({
+        calculation_status: data.calculation_status,
+        message: data.message,
+      });
+
+      if (data.calculation_status === "not_implemented") {
+        setFeedbackType("success");
+        setStatus(
+          "Request accepted by the API. Real route calculation is not available yet."
+        );
+      } else {
+        setFeedbackType("success");
+        setStatus("The API returned a response successfully.");
+      }
+    } catch {
+      setFeedbackType("error");
+      setStatus(
+        "Could not reach the planning API. Check that FastAPI is running and the API URL is correct."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -456,15 +594,49 @@ export default function Home() {
                 </span>
               </div>
 
-              <button className="primary-button" type="submit">
-                Validate route inputs
-                <Icon name="arrow" size={18} />
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Sending request..." : "Send to planning API"}
+                {!isSubmitting && <Icon name="arrow" size={18} />}
               </button>
 
               {status && (
-                <div className="feedback-message" role="status" aria-live="polite">
-                  <Icon name="check" size={17} />
+                <div
+                  className={`feedback-message feedback-${feedbackType}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {feedbackType === "success" ? (
+                    <Icon name="check" size={17} />
+                  ) : (
+                    <Icon name="shield" size={17} />
+                  )}
                   <span>{status}</span>
+                </div>
+              )}
+
+              {apiResult && (
+                <div className="api-result">
+                  <div className="api-result-header">
+                    <span>PLANNING API RESPONSE</span>
+                    <span className="api-result-status">HTTP 200</span>
+                  </div>
+
+                  <p>{apiResult.message}</p>
+
+                  <div className="api-result-detail">
+                    <span>Calculation status</span>
+                    <strong>{apiResult.calculation_status}</strong>
+                  </div>
+
+                  {apiResult.calculation_status === "not_implemented" && (
+                    <p className="api-result-note">
+                      The request was validated, but no real route has been calculated.
+                    </p>
+                  )}
                 </div>
               )}
             </form>
