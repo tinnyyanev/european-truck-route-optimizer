@@ -1,6 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
+import type { RouteGeometry } from "./components/RouteMap";
+
+const RouteMap = dynamic(() => import("./components/RouteMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="route-map-loading">
+      <span>Preparing map...</span>
+    </div>
+  ),
+});
 
 function Icon({
   name,
@@ -132,8 +143,14 @@ export default function Home() {
 
   const [apiResult, setApiResult] = useState<{
     calculation_status: string;
-    message: string;
+    provider: string;
+    distance_km: number;
+    duration_seconds: number;
+    geometry: RouteGeometry;
   } | null>(null);
+
+  const [apiConnected, setApiConnected] = useState(false);
+  const [mapTheme, setMapTheme] = useState<"light" | "dark">("light");
 
   async function handlePlanRoute(
   event: React.FormEvent<HTMLFormElement>
@@ -258,20 +275,33 @@ export default function Home() {
         return;
       }
 
+      if (
+        data.calculation_status !== "calculated" ||
+        !data.route?.geometry ||
+        !Array.isArray(data.route.geometry.coordinates) ||
+        data.route.geometry.coordinates.length < 2 ||
+        typeof data.route.distance_km !== "number" ||
+        typeof data.route.duration_seconds !== "number"
+      ) {
+        setFeedbackType("error");
+        setStatus(
+          "The API responded, but did not return a valid calculated route."
+        );
+        return;
+      }
+
       setApiResult({
         calculation_status: data.calculation_status,
-        message: data.message,
+        provider: data.provider ?? "unknown",
+        distance_km: data.route.distance_km,
+        duration_seconds: data.route.duration_seconds,
+        geometry: data.route.geometry,
       });
 
-      if (data.calculation_status === "not_implemented") {
-        setFeedbackType("success");
-        setStatus(
-          "Request accepted by the API. Real route calculation is not available yet."
-        );
-      } else {
-        setFeedbackType("success");
-        setStatus("The API returned a response successfully.");
-      }
+      setApiConnected(true);
+      setFeedbackType("success");
+      setStatus("Route calculated successfully.");
+
     } catch {
       setFeedbackType("error");
       setStatus(
@@ -407,9 +437,12 @@ export default function Home() {
                   <Icon name="route" size={18} />
                 </span>
               </div>
-              <div className="metric-value">Not connected</div>
+              <div className="metric-value">
+                {apiConnected ? "Connected" : "Awaiting route"}
+              </div>
               <div className="metric-foot">
-                <span className="mini-status" /> Integration pending
+                <span className="mini-status" />
+                {apiConnected ? "OpenRouteService response received" : "Calculate a route to verify"}
               </div>
             </article>
             <article className="metric-card">
@@ -621,22 +654,41 @@ export default function Home() {
               {apiResult && (
                 <div className="api-result">
                   <div className="api-result-header">
-                    <span>PLANNING API RESPONSE</span>
-                    <span className="api-result-status">HTTP 200</span>
+                    <span>CALCULATED ROUTE</span>
+                    <span className="api-result-status">SUCCESS</span>
                   </div>
 
-                  <p>{apiResult.message}</p>
+                  <div className="api-result-detail">
+                    <span>Distance</span>
+                    <strong>
+                      {apiResult.distance_km.toLocaleString("en-GB", {
+                        maximumFractionDigits: 1,
+                      })} km
+                    </strong>
+                  </div>
+
+                  <div className="api-result-detail">
+                    <span>Estimated driving time</span>
+                    <strong>
+                      {Math.floor(apiResult.duration_seconds / 3600)} h{" "}
+                      {Math.floor((apiResult.duration_seconds % 3600) / 60)} min
+                    </strong>
+                  </div>
 
                   <div className="api-result-detail">
                     <span>Calculation status</span>
                     <strong>{apiResult.calculation_status}</strong>
                   </div>
 
-                  {apiResult.calculation_status === "not_implemented" && (
-                    <p className="api-result-note">
-                      The request was validated, but no real route has been calculated.
-                    </p>
-                  )}
+                  <div className="api-result-detail">
+                    <span>Routing provider</span>
+                    <strong>{apiResult.provider}</strong>
+                  </div>
+
+                  <p className="api-result-note">
+                    Driving time is an estimate from the routing provider, not a guarantee
+                    of actual travel time or legal route eligibility.
+                  </p>
                 </div>
               )}
             </form>
@@ -651,39 +703,12 @@ export default function Home() {
               </div>
 
               <div className="map-canvas">
-                <div className="map-grid" />
-                <svg
-                  className="map-art"
-                  viewBox="0 0 540 390"
-                  preserveAspectRatio="xMidYMid slice"
-                  role="img"
-                  aria-label="Illustrative European road network, not a calculated route"
-                >
-                  <path className="land-shape" d="M60 45 145 28 196 58 246 42 289 78 344 65 394 102 456 92 510 142 475 190 500 236 453 270 415 330 354 344 317 305 270 318 225 286 175 303 143 255 99 235 113 185 72 147Z" />
-                  <path className="map-road" d="M28 98 Q120 142 166 98 T280 112 T395 136 T526 103" />
-                  <path className="map-road" d="M66 255 Q145 220 199 255 T315 224 T486 264" />
-                  <path className="map-road" d="M128 20 Q160 105 206 156 T244 275 T328 375" />
-                  <path className="map-road" d="M368 25 Q330 120 360 175 T403 275 T455 370" />
-                  <path className="map-road secondary" d="M45 178 Q155 160 242 196 T430 202 T535 180" />
-                  <path className="map-road secondary" d="M180 24 Q260 80 278 150 T305 270 T390 365" />
-                  <path className="route-line" d="M122 276 C145 245 165 225 193 211 S236 167 265 170 S324 140 344 116 S395 90 422 75" />
-                  <circle className="route-halo" cx="122" cy="276" r="12" />
-                  <circle className="route-point-start" cx="122" cy="276" r="5" />
-                  <circle className="route-halo" cx="422" cy="75" r="12" />
-                  <circle className="route-point-end" cx="422" cy="75" r="5" />
-                  <text className="map-label" x="80" y="308">MADRID</text>
-                  <text className="map-label" x="390" y="52">BERLIN</text>
-                  <text className="map-country" x="210" y="132">FRANCE</text>
-                  <text className="map-country" x="350" y="218">GERMANY</text>
-                  <text className="map-country" x="112" y="188">SPAIN</text>
-                </svg>
-                <div className="map-legend">
-                  <span><i className="legend-start" /> Origin</span>
-                  <span><i className="legend-end" /> Destination</span>
-                </div>
-                <div className="map-disclaimer">
-                  Illustrative preview · Not a calculated route
-                </div>
+                <RouteMap
+                  geometry={apiResult?.geometry ?? null}
+                  origin={origin}
+                  destination={destination}
+                  theme={mapTheme}
+                />
               </div>
 
               <div className="map-footer">
@@ -691,10 +716,15 @@ export default function Home() {
                   <Icon name="pin" size={18} />
                 </div>
                 <div>
-                  <strong>Ready for routing integration</strong>
+                  <strong>
+                    {apiResult ? "Route calculated" : "Ready for route planning"}
+                  </strong>
                   <p>
-                    A real road network and route geometry will appear here
-                    once a routing provider is connected.
+                    {apiResult
+                      ? `${apiResult.distance_km.toLocaleString("en-GB", {
+                          maximumFractionDigits: 1,
+                        })} km · OpenRouteService`
+                      : "Submit your journey to display the calculated road geometry."}
                   </p>
                 </div>
               </div>
